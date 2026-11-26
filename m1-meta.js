@@ -1,5 +1,5 @@
 LMS.module({
-  id: 'm1', num: 1, hours: 15,
+  id: 'm1', program: 'dam', num: 1, hours: 15,
   title: 'Introduction to Data Analytics in Media',
   blurb: 'What data analytics is, where media data comes from, how to collect it responsibly and how to build a clean dataset in Excel or Google Sheets.',
   outcomes: [

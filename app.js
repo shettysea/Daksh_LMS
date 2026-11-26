@@ -1,11 +1,12 @@
-/* Core of the Data Analytics Classroom: registry, storage, router, shell.
+/* Core of the Daksh Learning classroom: registry, storage, router, shell.
    Content lives in modules/*.js and registers itself with LMS.module / LMS.lesson.
    Widgets live in widgets.js and sheet.js and register with LMS.widget. */
 (function () {
   'use strict';
-  var LMS = window.LMS = { modules: [], widgets: {}, _uid: 0 };
+  var LMS = window.LMS = { programs: [], modules: [], widgets: {}, _uid: 0 };
 
   /* ---------- registry ---------- */
+  LMS.program = function (p) { LMS.programs.push(p); };
   LMS.module = function (m) { m.lessons = []; LMS.modules.push(m); };
   LMS.lesson = function (mid, l) {
     var m = LMS.modules.filter(function (x) { return x.id === mid; })[0];
@@ -62,13 +63,15 @@
 
   /* ---------- progress storage (this browser only) ---------- */
   var mem = null;
-  function blank() { return { lessons: {}, quiz: {}, checks: {}, notes: {} }; }
+  function blank() { return { lessons: {}, quiz: {}, checks: {}, notes: {}, games: {}, days: [], seen: [] }; }
   LMS.store = {
     get: function () {
       var p = null;
       try { var s = localStorage.getItem('dac.progress.v1'); if (s) p = JSON.parse(s); } catch (e) { }
       if (!p) p = mem || blank();
       ['lessons', 'quiz', 'checks', 'notes'].forEach(function (k) { if (!p[k]) p[k] = {}; });
+      ['days', 'seen'].forEach(function (k) { if (!Array.isArray(p[k])) p[k] = []; });
+      if (!p.games) p.games = {};
       return p;
     },
     set: function (p) {
@@ -80,11 +83,13 @@
   };
 
   /* ---------- progress maths ---------- */
-  function realModules() { return LMS.modules.filter(function (m) { return !m.soon; }); }
+  function realModules(pid) { return LMS.modules.filter(function (m) { return !m.soon && (!pid || m.program === pid); }); }
+  function progOf(m) { return LMS.programs.filter(function (p) { return p.id === m.program; })[0]; }
+  function progDone(pr) { var d = 0, t = 0; realModules(pr.id).forEach(function (m) { t += m.lessons.length; d += modDone(m); }); return { done: d, total: t }; }
   function modDone(m) { var p = LMS.store.get(); return m.lessons.filter(function (l) { return p.lessons[l.key]; }).length; }
-  function overall() {
+  function overall(pid) {
     var tot = 0, done = 0;
-    realModules().forEach(function (m) { tot += m.lessons.length; done += modDone(m); });
+    realModules(pid).forEach(function (m) { tot += m.lessons.length; done += modDone(m); });
     return tot ? Math.round(done / tot * 100) : 0;
   }
 
@@ -107,12 +112,15 @@
   function renderSide(cur) {
     var p = LMS.store.get();
     side.replaceChildren();
-    LMS.modules.forEach(function (m) {
+    var pr = cur.prog;
+    if (!pr) return;
+    side.append(h('a', { class: 'backlink', href: '#home' }, '← All programs'), h('a', { class: 'modlink', href: '#' + pr.id, style: 'font-size:1.15rem' }, pr.title));
+    LMS.modules.filter(function (m) { return m.program === pr.id; }).forEach(function (m) {
       if (m.soon) {
         side.append(h('h6', null, 'Module ' + m.num), h('div', { class: 'soon' }, m.title + ' (coming soon)'));
         return;
       }
-      var open = cur.mod && cur.mod.id === m.id || (!cur.mod && m.id === realModules()[0].id);
+      var open = cur.mod && cur.mod.id === m.id || (!cur.mod && m.id === realModules(pr.id)[0].id);
       side.append(h('h6', null, 'Module ' + m.num + ' · ' + modDone(m) + ' of ' + m.lessons.length + ' done'));
       side.append(h('a', { class: 'modlink', href: '#' + m.id, 'aria-current': cur.mod === m && !cur.lesson ? 'page' : null }, m.title));
       if (open) {
@@ -123,29 +131,59 @@
         })));
       }
     });
-    var pct = overall();
+    var pct = overall(pr.id);
     var bar = document.getElementById('overallBar'), txt = document.getElementById('overallTxt');
     if (bar) bar.style.width = pct + '%';
     if (txt) txt.textContent = pct + '% done';
   }
 
   function band(fxLabel, title, lede, extra) {
-    return h('section', { class: 'band' }, h('div', { class: 'wrap' },
-      fxLabel === 'A1' ? h('img', { class: 'home-logo', src: BRAND.logo, alt: 'Daksh Learning logo' }) : null,
+    return h('section', { class: 'band' }, h('div', { class: 'wrap' + (fxLabel === 'Welcome' ? ' wide' : '') },
+      fxLabel === 'Welcome' ? h('img', { class: 'home-logo', src: BRAND.logo, alt: 'Daksh Learning logo' }) : null,
+      fxLabel === 'Welcome' ? h('div', { class: 'stickers', 'aria-hidden': 'true' }, h('span', { class: 's1' }, '\uD83D\uDD25'), h('span', { class: 's2' }, '\uD83D\uDCCA'), h('span', { class: 's3' }, '\uD83C\uDFAE'), h('span', { class: 's4' }, '\u2728'), h('span', { class: 's5' }, '\uD83E\uDDE0')) : null,
       h('div', { class: 'fx' }, h('b', null, 'fx'), fxLabel),
       h('h1', null, title), lede ? h('p', { class: 'lede' }, lede) : null, extra));
   }
 
+  function groups(cards) {
+    var order = [], out = [];
+    LMS.programs.forEach(function (pr, i) {
+      var g = pr.group || 'Programs';
+      if (order.indexOf(g) < 0) order.push(g);
+    });
+    order.forEach(function (g) {
+      var items = cards.filter(function (c, i) { return (LMS.programs[i].group || 'Programs') === g; });
+      out.push(h('h2', null, g), h('div', { class: 'progs' }, items));
+    });
+    return out;
+  }
+
+  LMS.band = band;
+
   function viewHome() {
-    var first = realModules()[0];
-    var cards = LMS.modules.map(function (m) {
-      if (m.soon) return h('div', { class: 'card soon' }, h('span', { class: 'tag' }, 'Coming soon'), h('h3', null, 'Module ' + m.num), h('p', null, m.title));
-      return h('a', { class: 'card', href: '#' + m.id }, h('span', { class: 'tag' }, modDone(m) + ' of ' + m.lessons.length + ' lessons done'),
-        h('h3', null, 'Module ' + m.num + ': ' + m.title), h('p', null, m.blurb), h('p', { class: 'muted' }, m.hours + ' hours · ' + m.lessons.length + ' lessons'));
+    var cards = LMS.programs.map(function (pr) {
+      if (pr.soon) return h('div', { class: 'card soon' }, h('span', { class: 'tag' }, 'Coming soon'), h('h3', null, pr.title), h('p', null, pr.blurb));
+      var d = progDone(pr), mods = realModules(pr.id).length;
+      return h('a', { class: 'card', href: '#' + pr.id }, h('span', { class: 'tag' }, d.done + ' of ' + d.total + ' lessons done'),
+        h('h3', null, pr.title), h('p', null, pr.blurb), h('p', { class: 'muted' }, mods + ' of ' + LMS.modules.filter(function (m) { return m.program === pr.id; }).length + ' modules live' + (pr.level ? ' \u00b7 ' + pr.level : '')));
     });
     return [
-      band('A1', 'Read the numbers behind media.', 'A self-paced classroom for Data Analytics in Media. Short lessons, live calculators, a working spreadsheet and quizzes, all on one page.',
-        h('div', { class: 'cta' }, h('a', { class: 'btn', href: '#' + first.id }, 'Start Module ' + first.num), h('a', { class: 'btn ghost', href: '#' + first.id + '-p7' }, 'Jump to the practice test'))),
+      band('Welcome', 'Level up your skills. No cap.', 'Bite-sized lessons, games, streaks and badges. Learn real skills and actually enjoy it.',
+        h('div', { class: 'cta' }, h('button', { class: 'btn', onClick: function () { var e = document.getElementById('programs'); if (e) e.scrollIntoView({ behavior: 'smooth' }); } }, 'Pick a program'), h('a', { class: 'btn ghost', href: '#arcade' }, '\uD83C\uDFAE Play the arcade'))),
+      h('div', { class: 'wrap wide section' }, h('div', { class: 'pq' }, LMS.gam.playerCard(), LMS.gam.quoteCard()), h('div', { id: 'programs' }, groups(cards)),
+        h('p', { class: 'muted' }, 'Your progress is saved in this browser on this device. Use the same browser to pick up where you stopped.'))
+    ];
+  }
+
+  function viewProgram(pr) {
+    var cards = LMS.modules.filter(function (m) { return m.program === pr.id; }).map(function (m) {
+      if (m.soon) return h('div', { class: 'card soon' }, h('span', { class: 'tag' }, 'Coming soon'), h('h3', null, 'Module ' + m.num), h('p', null, m.title));
+      return h('a', { class: 'card', href: '#' + m.id }, h('span', { class: 'tag' }, modDone(m) + ' of ' + m.lessons.length + ' lessons done'),
+        h('h3', null, 'Module ' + m.num + ': ' + m.title), h('p', null, m.blurb), h('p', { class: 'muted' }, m.hours + ' hours \u00b7 ' + m.lessons.length + ' lessons'));
+    });
+    var first = realModules(pr.id)[0];
+    return [
+      band('Program', pr.title, pr.blurb, h('div', { class: 'cta' }, first ? h('a', { class: 'btn', href: '#' + first.id }, 'Start Module ' + first.num) : null, h('a', { class: 'btn ghost', href: '#home' }, '\u2190 All programs'))),
       h('div', { class: 'wrap section' },
         h('h2', null, 'Modules'), h('div', { class: 'cards' }, cards),
         h('h2', null, 'How every lesson works'),
@@ -153,8 +191,7 @@
           h('li', null, h('b', null, 'Learn'), 'The idea explained from zero, in plain words.'),
           h('li', null, h('b', null, 'See'), 'Worked examples from media and from other industries you may work in.'),
           h('li', null, h('b', null, 'Try it'), 'Calculators, drills and a real spreadsheet you can type into.'),
-          h('li', null, h('b', null, 'Check'), 'Cue questions and quizzes with instant feedback.')),
-        h('p', { class: 'muted' }, 'Your progress is saved in this browser on this device. It is not shared with your teacher. Use the same browser to pick up where you stopped.'))
+          h('li', null, h('b', null, 'Check'), 'Cue questions and quizzes with instant feedback.')))
     ];
   }
 
@@ -167,7 +204,7 @@
     });
     var next = m.lessons.filter(function (l) { return !p.lessons[l.key]; })[0] || m.lessons[0];
     return [
-      band('Module ' + m.num, m.title, m.blurb, h('div', { class: 'cta' }, h('a', { class: 'btn', href: '#' + next.key }, modDone(m) ? 'Continue: ' + next.title : 'Start lesson 1'))),
+      band('Module ' + m.num, m.title, m.blurb, h('div', { class: 'cta' }, h('a', { class: 'btn', href: '#' + next.key }, modDone(m) ? 'Continue: ' + next.title : 'Start lesson 1'), h('a', { class: 'btn ghost', href: '#' + m.program }, '\u2190 Modules'))),
       h('div', { class: 'wrap section' },
         h('h2', null, 'What you will be able to do'), h('div', { class: 'prose', html: LMS.ol(m.outcomes || []) }),
         h('h2', null, 'Lessons (' + m.hours + ' hours in total)'), h('ul', { class: 'lessonlist' }, items))
@@ -183,16 +220,17 @@
     var doneBtn = h('button', { class: 'btn' + (p.lessons[l.key] ? ' ghost' : ''), onClick: function () {
       var was = !!LMS.store.get().lessons[l.key];
       LMS.store.update(function (q) { if (was) delete q.lessons[l.key]; else q.lessons[l.key] = true; });
-      doneBtn.textContent = !was ? 'Completed. Click to undo' : 'Mark lesson complete';
+      doneBtn.textContent = !was ? 'Done \u2705 Tap to undo' : 'Mark lesson complete';
+      if (!was) LMS.gam.lessonDone();
       doneBtn.classList.toggle('ghost', !was);
-    } }, p.lessons[l.key] ? 'Completed. Click to undo' : 'Mark lesson complete');
+    } }, p.lessons[l.key] ? 'Done \u2705 Tap to undo' : 'Mark lesson complete');
     return [
       band('Lesson ' + (idx + 1) + ' of ' + m.lessons.length + ' · ' + l.minutes + ' min', l.title, l.intro),
-      h('div', { class: 'wrap' }, secs,
+      h('div', { class: 'wrap' }, secs, LMS.gam.quoteCard({ seed: idx + m.num * 7, label: 'Brain break', shuffle: false }),
         h('div', { class: 'lessonnav' },
           prev ? h('a', { class: 'btn ghost', href: '#' + prev.key }, '← ' + prev.title) : h('a', { class: 'btn ghost', href: '#' + m.id }, '← Module overview'),
           doneBtn,
-          next ? h('a', { class: 'btn', href: '#' + next.key }, next.title + ' →') : h('a', { class: 'btn', href: '#home' }, 'Back to all modules')))
+          next ? h('a', { class: 'btn', href: '#' + next.key }, next.title + ' →') : h('a', { class: 'btn', href: '#' + m.program }, 'Back to all modules')))
     ];
   }
 
@@ -200,9 +238,12 @@
     var hash = location.hash.replace(/^#/, '');
     var cur = { view: 'home' };
     if (!hash || hash === 'home') return cur;
+    if (hash === 'arcade' || hash.indexOf('arcade-') === 0) { cur.view = 'arcade'; cur.game = hash.slice(7) || null; return cur; }
+    var pr = LMS.programs.filter(function (x) { return x.id === hash && !x.soon; })[0];
+    if (pr) { cur.view = 'program'; cur.prog = pr; return cur; }
     var mod = LMS.modules.filter(function (x) { return hash === x.id || hash.indexOf(x.id + '-') === 0; })[0];
     if (!mod || mod.soon) return cur;
-    cur.mod = mod; cur.view = 'module';
+    cur.mod = mod; cur.prog = progOf(mod); cur.view = 'module';
     if (hash !== mod.id) {
       var l = mod.lessons.filter(function (x) { return x.key === hash; })[0];
       if (l) { cur.lesson = l; cur.view = 'lesson'; }
@@ -213,16 +254,19 @@
   var lastKey = null;
   function route() {
     var cur = parse();
-    var nodes = cur.view === 'lesson' ? viewLesson(cur.lesson) : cur.view === 'module' ? viewModule(cur.mod) : viewHome();
+    var nodes = cur.view === 'lesson' ? viewLesson(cur.lesson) : cur.view === 'module' ? viewModule(cur.mod) : cur.view === 'program' ? viewProgram(cur.prog) : cur.view === 'arcade' ? LMS.viewArcade(cur.game) : viewHome();
     nodes.push(h('footer', { class: 'brandfoot' }, h('img', { src: BRAND.logo, alt: '' }), 'Daksh Learning'));
     app.replaceChildren.apply(app, nodes);
     wrapTables(app);
-    renderSide(cur);
+    var hasSide = cur.view === 'module' || cur.view === 'lesson';
+    document.body.classList.toggle('no-side', !hasSide);
+    var ov = document.querySelector('.overall'); if (ov) ov.classList.toggle('hidden', !cur.prog);
+    renderSide(hasSide ? cur : {});
     document.body.classList.remove('nav-open');
     var mb = document.getElementById('menuBtn'); if (mb) mb.setAttribute('aria-expanded', 'false');
-    var key = cur.view + (cur.lesson ? cur.lesson.key : cur.mod ? cur.mod.id : '');
+    var key = cur.view + (cur.game || '') + (cur.lesson ? cur.lesson.key : cur.mod ? cur.mod.id : cur.prog ? cur.prog.id : '');
     if (key !== lastKey) { window.scrollTo(0, 0); lastKey = key; }
-    document.title = (cur.lesson ? cur.lesson.title + ' | ' : cur.mod ? 'Module ' + cur.mod.num + ' | ' : '') + 'Daksh Learning | Data Analytics Classroom';
+    document.title = (cur.view === 'arcade' ? 'Arcade | ' : '') + (cur.lesson ? cur.lesson.title + ' | ' : cur.mod ? 'Module ' + cur.mod.num + ' | ' : cur.prog ? cur.prog.title + ' | ' : '') + 'Daksh Learning';
   }
 
   LMS.start = function () {
@@ -233,7 +277,8 @@
     });
     sc.addEventListener('click', function () { document.body.classList.remove('nav-open'); mb.setAttribute('aria-expanded', 'false'); });
     window.addEventListener('hashchange', route);
-    window.addEventListener('lms-progress', function () { renderSide(parse()); });
+    if (LMS.gam) LMS.gam.init();
+    window.addEventListener('lms-progress', function () { var c = parse(); renderSide(c.view === 'module' || c.view === 'lesson' ? c : {}); });
     route();
   };
 })();

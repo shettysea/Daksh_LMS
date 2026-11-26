@@ -56,7 +56,7 @@
         if (answered) return; answered = true;
         if (ok) score++; else missed.push({ q: q.q, a: correctText });
         fb.className = 'fb ' + (ok ? 'good' : 'bad');
-        fb.innerHTML = (ok ? '<b>Correct.</b> ' : '<b>Not quite.</b> Answer: ' + LMS.esc(correctText) + '. ') + (q.why || '');
+        fb.innerHTML = (ok ? '<b>Yes! \u2705</b> ' : '<b>Close, not quite \uD83D\uDE05</b> Answer: ' + LMS.esc(correctText) + '. ') + (q.why || '');
         next.hidden = false; next.focus();
       }
       if (q.type === 'num') {
@@ -92,7 +92,8 @@
         p.quiz[b.id] = { best: Math.max(old, score), total: total };
       });
       var best = LMS.store.get().quiz[b.id].best;
-      var msg = pct >= 85 ? 'Strong. You are ready to move on.' : pct >= 60 ? 'Good start. Reread the parts behind the missed questions and try again.' : 'Reread the lesson slowly, do the Try it boxes on a laptop, then retry.';
+      if (LMS.gam) LMS.gam.quizDone(pct);
+      var msg = pct >= 85 ? 'Big brain energy. You are ready to move on.' : pct >= 60 ? 'Good start. Reread the parts behind the missed questions and try again.' : 'Reread the lesson slowly, do the Try it boxes on a laptop, then retry.';
       wrap.append(h('div', { class: 'score' }, score + ' / ' + total), h('p', null, msg + ' Your best score here: ' + best + ' / ' + total + '.'));
       if (missed.length) wrap.append(h('p', null, h('b', null, 'Review these:')),
         h('ul', { class: 'missed' }, missed.map(function (m) { return h('li', null, h('span', { html: m.q }), ' ', h('b', null, '→ ' + m.a)); })));
