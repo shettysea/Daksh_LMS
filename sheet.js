@@ -261,6 +261,7 @@
     return h('div', { class: 'widget' }, h('h4', null, b.title || 'Spreadsheet lab'),
       h('p', { class: 'muted' }, b.help || 'This is Dataset A. White cells are yours. Grey cells are locked data. Rows 12 and 13 are scratch rows for trying functions.'),
       h('div', { class: 'fbar' }, addrBox, h('span', { class: 'fxl' }, 'fx'), fv),
+      h('p', { class: 'swipehint' }, 'Swipe the sheet sideways to see columns J and K.'),
       h('div', { class: 'sheetscroll' }, table),
       h('div', { class: 'row' }, h('button', { class: 'btn small', onClick: fillDown }, 'Fill down'), reset,
         h('label', { for: pctBox.id, style: 'display:inline-flex;gap:8px;align-items:center;min-height:36px' }, pctBox, 'Show column K as percentage')),
