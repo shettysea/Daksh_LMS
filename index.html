@@ -429,6 +429,12 @@ a.card:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--shc)}
 .check input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--accent)}
 @media(prefers-reduced-motion:reduce){.stickers span,.badge.got,.fb.good,.gfb.good,.shake,.mem.ok{animation:none!important}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+.dluser{display:flex;align-items:center;gap:8px;margin-left:8px;flex:none}
+.dluser img{width:28px;height:28px;border-radius:50%;border:2px solid var(--gold)}
+.dluser span{font-weight:700;font-size:.9rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dluser button{font:inherit;font-size:.82rem;font-weight:700;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:99px;padding:4px 10px;cursor:pointer;min-height:32px}
+@media(max-width:600px){.dluser span{display:none}.dluser{margin-left:4px}}
 </style>
 </head>
 <body>
@@ -449,6 +455,10 @@ a.card:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--shc)}
 <script src="brand.js"></script>
 <script>document.getElementById("brandLogo").src=BRAND.logo;</script>
 <!-- Core and widgets. To add a module, add its script tags below the Module 1 lines. -->
+<script src="auth-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
+<script>DLAuth.guard();</script>
 <script src="app.js"></script>
 <script src="quotes.js"></script>
 <script src="gamify.js"></script>

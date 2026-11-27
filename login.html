@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Log in | Daksh Learning Classroom</title>
+<meta name="theme-color" content="#04045e">
+<style>
+:root{--navy:#04045e;--blue:#023ff9;--gold:#f0b84a;--grey:#bcbcbc;--grid:#0d0d5c}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background-color:#03032f;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px;background-position:-1px -1px;color:#f1f2ff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+.card{width:100%;max-width:420px;background:#08084f;border:3px solid var(--gold);border-radius:18px;box-shadow:6px 6px 0 #000;padding:30px 24px 24px;text-align:center}
+.card img{width:72px;height:72px;background:#fff;border:3px solid var(--gold);border-radius:50%;padding:8px}
+.brand{font-weight:800;letter-spacing:.02em;margin:10px 0 0;color:var(--gold);font-size:1.05rem}
+h1{font-size:1.7rem;line-height:1.2;margin:14px 0 8px}
+p{margin:0 0 18px;color:#b4b7e6;line-height:1.5}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:50px;border:3px solid #000;border-radius:12px;background:#fff;color:#1f1f1f;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:4px 4px 0 var(--gold)}
+.gbtn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--gold)}
+.gbtn:disabled{opacity:.6;cursor:wait}
+.gbtn svg{width:22px;height:22px;flex:none}
+.msg{min-height:1.3em;margin:14px 0 0;font-size:.92rem;color:#ffb4b4}
+.fine{margin:16px 0 0;font-size:.8rem;color:var(--grey)}
+</style>
+</head>
+<body>
+<main class="card">
+  <img id="logo" alt="Daksh Learning logo" width="72" height="72">
+  <div class="brand">Daksh Learning</div>
+  <h1>Welcome to the classroom</h1>
+  <p>Sign in with Google to start learning, track your XP and keep your streak alive.</p>
+  <button class="gbtn" id="go" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+    <span>Continue with Google</span>
+  </button>
+  <div class="msg" id="msg" role="status"></div>
+  <div class="fine">New here? Signing in creates your account automatically.</div>
+</main>
+<script src="brand.js"></script>
+<script>document.getElementById('logo').src = BRAND.logo;</script>
+<script src="auth-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
+<script>
+(function () {
+  var msg = document.getElementById('msg'), go = document.getElementById('go');
+  var c = DLAuth.client();
+  if (!c) { msg.textContent = 'Login is not set up yet. Ask your trainer.'; go.disabled = true; return; }
+  // Already signed in (or just returned from Google)? Set the cookie and enter.
+  c.auth.getSession().then(function (r) {
+    var s = r.data && r.data.session;
+    if (s) { DLAuth.setCookie(s); location.replace('/'); }
+  });
+  c.auth.onAuthStateChange(function (ev, s) {
+    if (s && (ev === 'SIGNED_IN' || ev === 'TOKEN_REFRESHED')) { DLAuth.setCookie(s); location.replace('/'); }
+  });
+  go.addEventListener('click', function () {
+    go.disabled = true; msg.textContent = '';
+    DLAuth.signIn().catch(function (e) { go.disabled = false; msg.textContent = e.message || 'Could not start sign-in'; });
+  });
+})();
+</script>
+</body>
+</html>
