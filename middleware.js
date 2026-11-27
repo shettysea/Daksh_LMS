@@ -36,6 +36,6 @@ export default async function middleware(request) {
   if (PUBLIC.has(url.pathname)) return next();
   if (await valid(readCookie(request, 'dl-token'))) return next();
   const wantsPage = url.pathname === '/' || url.pathname.endsWith('.html') || (request.headers.get('accept') || '').includes('text/html');
-  if (wantsPage) return new Response(null, { status: 302, headers: { Location: '/login.html', 'Cache-Control': 'no-store' } });
+  if (wantsPage) return new Response(null, { status: 302, headers: { Location: '/login.html' + (readCookie(request, 'dl-token') ? '?denied=1' : ''), 'Cache-Control': 'no-store' } });
   return new Response('Please log in', { status: 401, headers: { 'Cache-Control': 'no-store' } });
 }

@@ -46,14 +46,22 @@ p{margin:0 0 18px;color:#b4b7e6;line-height:1.5}
   var msg = document.getElementById('msg'), go = document.getElementById('go');
   var c = DLAuth.client();
   if (!c) { msg.textContent = 'Login is not set up yet. Ask your trainer.'; go.disabled = true; return; }
-  // Already signed in (or just returned from Google)? Set the cookie and enter.
-  c.auth.getSession().then(function (r) {
-    var s = r.data && r.data.session;
-    if (s) { DLAuth.setCookie(s); location.replace('/'); }
-  });
-  c.auth.onAuthStateChange(function (ev, s) {
-    if (s && (ev === 'SIGNED_IN' || ev === 'TOKEN_REFRESHED')) { DLAuth.setCookie(s); location.replace('/'); }
-  });
+  var denied = /[?&]denied=1/.test(location.search);
+  if (denied) {
+    // Server refused our session: stop the loop and show why.
+    DLAuth.setCookie(null);
+    c.auth.signOut().then(function () {
+      msg.textContent = 'Signed in with Google, but the server rejected the session. Check SUPABASE_URL and SUPABASE_ANON_KEY in Vercel, then redeploy.';
+    });
+  } else {
+    c.auth.getSession().then(function (r) {
+      var s = r.data && r.data.session;
+      if (s) { DLAuth.setCookie(s); location.replace('/'); }
+    });
+    c.auth.onAuthStateChange(function (ev, s) {
+      if (s && (ev === 'SIGNED_IN' || ev === 'TOKEN_REFRESHED')) { DLAuth.setCookie(s); location.replace('/'); }
+    });
+  }
   go.addEventListener('click', function () {
     go.disabled = true; msg.textContent = '';
     DLAuth.signIn().catch(function (e) { go.disabled = false; msg.textContent = e.message || 'Could not start sign-in'; });
